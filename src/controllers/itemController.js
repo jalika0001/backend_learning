@@ -5,31 +5,28 @@ const filePath = path.join(__dirname, "../db/items.json");
 
 // READ FILE
 const getItems = () => {
-  return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  return JSON.parse(
+    fs.readFileSync(filePath, "utf-8")
+  );
 };
 
 // SAVE FILE
 const saveItems = (data) => {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify(data, null, 2)
+  );
 };
 
-
+// GET ALL ITEMS
 exports.getAllItems = (req, res) => {
 
   try {
 
     const items = getItems();
 
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized"
-      });
-    }
-
     const userItems = items.filter(
-      item => item.userId === userId
+      item => item.userId === req.user.id
     );
 
     res.json(userItems);
@@ -45,28 +42,7 @@ exports.getAllItems = (req, res) => {
   }
 };
 
-exports.getItemById = (req, res) => {
-  try {
-    const items = getItems();
-
-    const item = items.find(
-      (i) => i.id === parseInt(req.params.id)
-    );
-
-    if (!item) {
-      return res.status(404).json({
-        message: "Item not found"
-      });
-    }
-
-    res.json(item);
-
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-
+// CREATE ITEM
 exports.createItem = (req, res) => {
 
   try {
@@ -85,68 +61,114 @@ exports.createItem = (req, res) => {
       id: Date.now(),
       name,
       price,
-      userId: req.user.id   // 🔥 important
+
+      // image filename
+      image: req.file
+        ? req.file.filename
+        : null,
+
+      userId: req.user.id
     };
 
     items.push(newItem);
+
     saveItems(items);
 
     res.status(201).json(newItem);
 
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+
+    console.log(err);
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
 };
 
+// UPDATE ITEM
 exports.updateItem = (req, res) => {
   try {
-    const items = getItems();
+    const { id } = req.params;
+    const { name, price } = req.body;
 
-    const index = items.findIndex(
-      (i) => i.id === parseInt(req.params.id)
+    if (!name || !price) {
+      return res.status(400).json({
+        message: "Name and price required"
+      });
+    }
+
+    const items = getItems();
+    const itemIndex = items.findIndex(
+      item => item.id === parseInt(id) && item.userId === req.user.id
     );
 
-    if (index === -1) {
+    if (itemIndex === -1) {
       return res.status(404).json({
         message: "Item not found"
       });
     }
 
-    items[index] = {
-      ...items[index],
-      ...req.body
-    };
+    items[itemIndex].name = name;
+    items[itemIndex].price = price;
+
+    if (req.file) {
+      if (items[itemIndex].image) {
+        const oldImagePath = path.join(__dirname, "../uploads", items[itemIndex].image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      items[itemIndex].image = req.file.filename;
+    }
 
     saveItems(items);
-
-    res.json(items[index]);
+    res.json(items[itemIndex]);
 
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    console.log(err);
+    res.status(500).json({
+      message: "Server error"
+    });
   }
 };
 
+// DELETE ITEM
 exports.deleteItem = (req, res) => {
   try {
-    const items = getItems();
+    const { id } = req.params;
 
-    const newItems = items.filter(
-      (i) => i.id !== parseInt(req.params.id)
+    const items = getItems();
+    const itemIndex = items.findIndex(
+      item => item.id === parseInt(id) && item.userId === req.user.id
     );
 
-    if (items.length === newItems.length) {
+    if (itemIndex === -1) {
       return res.status(404).json({
         message: "Item not found"
       });
     }
 
-    saveItems(newItems);
+    if (items[itemIndex].image) {
+      const imagePath = path.join(__dirname, "../uploads", items[itemIndex].image);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    const deletedItem = items.splice(itemIndex, 1);
+    saveItems(items);
 
     res.json({
-      message: "Item deleted"
+      message: "Item deleted successfully",
+      item: deletedItem[0]
     });
 
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    console.log(err);
+    res.status(500).json({
+      message: "Server error"
+    });
   }
 };

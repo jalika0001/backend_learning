@@ -3,11 +3,24 @@ dotenv.config();
 
 const cors = require("cors");
 const express = require("express");
-const { ensureJsonFile } = require("./src/utils/githubJsonStore");
+const path = require("path");
+const {
+  ensureJsonFile,
+  ensureFile,
+  readFileBuffer
+} = require("./src/utils/githubJsonStore");
 
 const app = express();
 const USERS_FILE_PATH = process.env.USERS_FILE_PATH || "src/db/users.json";
 const ITEMS_FILE_PATH = process.env.ITEMS_FILE_PATH || "src/db/items.json";
+const UPLOADS_DIR = process.env.UPLOADS_DIR || "uploads";
+
+const mimeByExt = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp"
+};
 
 app.use(cors({
   origin: [
@@ -23,7 +36,22 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use("/uploads", express.static("uploads"));
+app.get("/uploads/:filename", async (req, res) => {
+  try {
+    const filePath = `${UPLOADS_DIR}/${req.params.filename}`;
+    const file = await readFileBuffer(filePath);
+
+    if (!file) {
+      return res.status(404).json({ message: "Image not found" });
+    }
+
+    const ext = path.extname(req.params.filename || "").toLowerCase();
+    res.setHeader("Content-Type", mimeByExt[ext] || "application/octet-stream");
+    return res.send(file.buffer);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to load image" });
+  }
+});
 
 app.use("/auth", require("./src/routes/authRoutes"));
 app.use("/items", require("./src/routes/itemRoutes"));
@@ -39,6 +67,7 @@ const startServer = async () => {
   try {
     await ensureJsonFile(USERS_FILE_PATH, [], "init: create users.json");
     await ensureJsonFile(ITEMS_FILE_PATH, [], "init: create items.json");
+    await ensureFile(`${UPLOADS_DIR}/.gitkeep`, "", "init: create uploads folder");
     console.log("GitHub JSON files ready");
   } catch (error) {
     console.error("GitHub JSON init failed:", error.message);

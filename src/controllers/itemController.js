@@ -1,7 +1,17 @@
-const fs = require("fs");
 const path = require("path");
 const ITEMS_FILE_PATH = process.env.ITEMS_FILE_PATH || "src/db/items.json";
-const { readJsonFile, writeJsonFile } = require("../utils/githubJsonStore");
+const UPLOADS_DIR = process.env.UPLOADS_DIR || "uploads";
+const {
+  readJsonFile,
+  writeJsonFile,
+  uploadBufferFile,
+  deleteFile
+} = require("../utils/githubJsonStore");
+
+const makeImageName = (originalName) => {
+  const ext = path.extname(originalName || "").toLowerCase();
+  return `${Date.now()}${ext}`;
+};
 
 // GET ALL ITEMS
 exports.getAllItems = async (req, res) => {
@@ -42,15 +52,20 @@ exports.createItem = async (req, res) => {
 
     const items = await readJsonFile(ITEMS_FILE_PATH, []);
 
+    let imageName = null;
+    if (req.file?.buffer) {
+      imageName = makeImageName(req.file.originalname);
+      const githubImagePath = `${UPLOADS_DIR}/${imageName}`;
+      await uploadBufferFile(githubImagePath, req.file.buffer, `uploads: create ${imageName}`);
+    }
+
     const newItem = {
       id: Date.now(),
       name,
       price,
 
       // image filename
-      image: req.file
-        ? req.file.filename
-        : null,
+      image: imageName,
 
       userId: req.user.id
     };
@@ -98,14 +113,17 @@ exports.updateItem = async (req, res) => {
     items[itemIndex].name = name;
     items[itemIndex].price = price;
 
-    if (req.file) {
+    if (req.file?.buffer) {
+      const newImageName = makeImageName(req.file.originalname);
+      const newImagePath = `${UPLOADS_DIR}/${newImageName}`;
+      await uploadBufferFile(newImagePath, req.file.buffer, `uploads: update ${newImageName}`);
+
       if (items[itemIndex].image) {
-        const oldImagePath = path.join(__dirname, "../uploads", items[itemIndex].image);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
+        const oldImagePath = `${UPLOADS_DIR}/${items[itemIndex].image}`;
+        await deleteFile(oldImagePath, `uploads: delete old ${items[itemIndex].image}`);
       }
-      items[itemIndex].image = req.file.filename;
+
+      items[itemIndex].image = newImageName;
     }
 
     await writeJsonFile(ITEMS_FILE_PATH, items, `items: update ${items[itemIndex].id}`);
@@ -136,10 +154,8 @@ exports.deleteItem = async (req, res) => {
     }
 
     if (items[itemIndex].image) {
-      const imagePath = path.join(__dirname, "../uploads", items[itemIndex].image);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
+      const imagePath = `${UPLOADS_DIR}/${items[itemIndex].image}`;
+      await deleteFile(imagePath, `uploads: delete ${items[itemIndex].image}`);
     }
 
     const deletedItem = items.splice(itemIndex, 1);

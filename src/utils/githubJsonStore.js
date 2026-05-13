@@ -30,6 +30,23 @@ const getFile = async (filePath) => {
   });
 };
 
+const getFileByPath = async (filePath) => {
+  try {
+    const { data } = await getFile(filePath);
+    if (Array.isArray(data)) {
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    if (error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+};
+
 exports.readJsonFile = async (filePath, fallbackData = []) => {
   try {
     const { data } = await getFile(filePath);
@@ -73,6 +90,71 @@ exports.writeJsonFile = async (filePath, jsonData, message) => {
     message,
     content,
     sha
+  });
+};
+
+exports.ensureFile = async (filePath, contentString, message) => {
+  const existing = await getFileByPath(filePath);
+  if (existing) {
+    return;
+  }
+
+  const content = Buffer.from(contentString, "utf-8").toString("base64");
+  const { owner, repo } = getConfig();
+  const octokit = getOctokit();
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: filePath,
+    message,
+    content
+  });
+};
+
+exports.uploadBufferFile = async (filePath, buffer, message) => {
+  const { owner, repo } = getConfig();
+  const octokit = getOctokit();
+  const existing = await getFileByPath(filePath);
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: filePath,
+    message,
+    content: buffer.toString("base64"),
+    sha: existing ? existing.sha : undefined
+  });
+};
+
+exports.readFileBuffer = async (filePath) => {
+  const data = await getFileByPath(filePath);
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    buffer: Buffer.from(data.content, "base64"),
+    sha: data.sha
+  };
+};
+
+exports.deleteFile = async (filePath, message) => {
+  const { owner, repo } = getConfig();
+  const octokit = getOctokit();
+  const existing = await getFileByPath(filePath);
+
+  if (!existing) {
+    return;
+  }
+
+  await octokit.repos.deleteFile({
+    owner,
+    repo,
+    path: filePath,
+    message,
+    sha: existing.sha
   });
 };
 

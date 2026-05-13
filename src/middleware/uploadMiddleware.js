@@ -1,22 +1,4 @@
 const multer = require("multer");
-const path = require("path");
-
-// storage config
-const storage = multer.diskStorage({
-
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-
-  filename: (req, file, cb) => {
-
-    const uniqueName =
-      Date.now() +
-      path.extname(file.originalname);
-
-    cb(null, uniqueName);
-  }
-});
 
 // file filter
 const fileFilter = (req, file, cb) => {
@@ -38,7 +20,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 module.exports = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: {
     fileSize: 2 * 1024 * 1024 // 2MB

@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { backupToGitHub } = require("../utils/githubBackup");
 
 const filePath = path.join(__dirname, "../db/users.json");
 
@@ -64,6 +65,7 @@ exports.register = async (req, res) => {
 
     users.push(newUser);
     saveUsers(users);
+    backupToGitHub("user-register");
 
     // 🔥 CREATE TOKEN (IMPORTANT)
     const token = jwt.sign(

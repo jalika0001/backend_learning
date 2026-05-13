@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { backupToGitHub } = require("../utils/githubBackup");
 
 const filePath = path.join(__dirname, "../db/items.json");
 
@@ -73,6 +74,7 @@ exports.createItem = (req, res) => {
     items.push(newItem);
 
     saveItems(items);
+    backupToGitHub("item-create");
 
     res.status(201).json(newItem);
 
@@ -124,6 +126,7 @@ exports.updateItem = (req, res) => {
     }
 
     saveItems(items);
+    backupToGitHub("item-update");
     res.json(items[itemIndex]);
 
   } catch (err) {
@@ -159,6 +162,7 @@ exports.deleteItem = (req, res) => {
 
     const deletedItem = items.splice(itemIndex, 1);
     saveItems(items);
+    backupToGitHub("item-delete");
 
     res.json({
       message: "Item deleted successfully",

@@ -12,6 +12,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use((req, res) => {
+  res.send("Welcome to the Item Management API");
+});
 
 app.use("/uploads", express.static("uploads"));
 

@@ -2,29 +2,11 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const SECRET = process.env.SECRET || "ngx123";
+const USERS_FILE_PATH = process.env.USERS_FILE_PATH || "src/db/users.json";
 
-const fs = require("fs");
-const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { backupToGitHub } = require("../utils/githubBackup");
-
-const filePath = path.join(__dirname, "../db/users.json");
-
-// READ USERS
-const getUsers = () => {
-  return JSON.parse(
-    fs.readFileSync(filePath, "utf-8")
-  );
-};
-
-// SAVE USERS
-const saveUsers = (data) => {
-  fs.writeFileSync(
-    filePath,
-    JSON.stringify(data, null, 2)
-  );
-};
+const { readJsonFile, writeJsonFile } = require("../utils/githubJsonStore");
 
 // REGISTER
 exports.register = async (req, res) => {
@@ -40,7 +22,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    const users = getUsers();
+    const users = await readJsonFile(USERS_FILE_PATH, []);
 
     // check existing user
     const exist = users.find(
@@ -64,8 +46,7 @@ exports.register = async (req, res) => {
     };
 
     users.push(newUser);
-    saveUsers(users);
-    backupToGitHub("user-register");
+    await writeJsonFile(USERS_FILE_PATH, users, `users: register ${newUser.username}`);
 
     // 🔥 CREATE TOKEN (IMPORTANT)
     const token = jwt.sign(
@@ -109,7 +90,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const users = getUsers();
+    const users = await readJsonFile(USERS_FILE_PATH, []);
 
     // find user
     const user = users.find(

@@ -3,8 +3,11 @@ dotenv.config();
 
 const cors = require("cors");
 const express = require("express");
+const { ensureJsonFile } = require("./src/utils/githubJsonStore");
 
 const app = express();
+const USERS_FILE_PATH = process.env.USERS_FILE_PATH || "src/db/users.json";
+const ITEMS_FILE_PATH = process.env.ITEMS_FILE_PATH || "src/db/items.json";
 
 app.use(cors({
   origin: [
@@ -32,6 +35,18 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await ensureJsonFile(USERS_FILE_PATH, [], "init: create users.json");
+    await ensureJsonFile(ITEMS_FILE_PATH, [], "init: create items.json");
+    console.log("GitHub JSON files ready");
+  } catch (error) {
+    console.error("GitHub JSON init failed:", error.message);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server running on ${PORT}`);
+  });
+};
+
+startServer();

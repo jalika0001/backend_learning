@@ -1,30 +1,14 @@
 const fs = require("fs");
 const path = require("path");
-const { backupToGitHub } = require("../utils/githubBackup");
-
-const filePath = path.join(__dirname, "../db/items.json");
-
-// READ FILE
-const getItems = () => {
-  return JSON.parse(
-    fs.readFileSync(filePath, "utf-8")
-  );
-};
-
-// SAVE FILE
-const saveItems = (data) => {
-  fs.writeFileSync(
-    filePath,
-    JSON.stringify(data, null, 2)
-  );
-};
+const ITEMS_FILE_PATH = process.env.ITEMS_FILE_PATH || "src/db/items.json";
+const { readJsonFile, writeJsonFile } = require("../utils/githubJsonStore");
 
 // GET ALL ITEMS
-exports.getAllItems = (req, res) => {
+exports.getAllItems = async (req, res) => {
 
   try {
 
-    const items = getItems();
+    const items = await readJsonFile(ITEMS_FILE_PATH, []);
 
     const userItems = items.filter(
       item => item.userId === req.user.id
@@ -44,7 +28,7 @@ exports.getAllItems = (req, res) => {
 };
 
 // CREATE ITEM
-exports.createItem = (req, res) => {
+exports.createItem = async (req, res) => {
 
   try {
 
@@ -56,7 +40,7 @@ exports.createItem = (req, res) => {
       });
     }
 
-    const items = getItems();
+    const items = await readJsonFile(ITEMS_FILE_PATH, []);
 
     const newItem = {
       id: Date.now(),
@@ -73,8 +57,7 @@ exports.createItem = (req, res) => {
 
     items.push(newItem);
 
-    saveItems(items);
-    backupToGitHub("item-create");
+    await writeJsonFile(ITEMS_FILE_PATH, items, `items: create ${newItem.id}`);
 
     res.status(201).json(newItem);
 
@@ -90,7 +73,7 @@ exports.createItem = (req, res) => {
 };
 
 // UPDATE ITEM
-exports.updateItem = (req, res) => {
+exports.updateItem = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, price } = req.body;
@@ -101,7 +84,7 @@ exports.updateItem = (req, res) => {
       });
     }
 
-    const items = getItems();
+    const items = await readJsonFile(ITEMS_FILE_PATH, []);
     const itemIndex = items.findIndex(
       item => item.id === parseInt(id) && item.userId === req.user.id
     );
@@ -125,8 +108,7 @@ exports.updateItem = (req, res) => {
       items[itemIndex].image = req.file.filename;
     }
 
-    saveItems(items);
-    backupToGitHub("item-update");
+    await writeJsonFile(ITEMS_FILE_PATH, items, `items: update ${items[itemIndex].id}`);
     res.json(items[itemIndex]);
 
   } catch (err) {
@@ -138,11 +120,11 @@ exports.updateItem = (req, res) => {
 };
 
 // DELETE ITEM
-exports.deleteItem = (req, res) => {
+exports.deleteItem = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const items = getItems();
+    const items = await readJsonFile(ITEMS_FILE_PATH, []);
     const itemIndex = items.findIndex(
       item => item.id === parseInt(id) && item.userId === req.user.id
     );
@@ -161,8 +143,7 @@ exports.deleteItem = (req, res) => {
     }
 
     const deletedItem = items.splice(itemIndex, 1);
-    saveItems(items);
-    backupToGitHub("item-delete");
+    await writeJsonFile(ITEMS_FILE_PATH, items, `items: delete ${deletedItem[0].id}`);
 
     res.json({
       message: "Item deleted successfully",

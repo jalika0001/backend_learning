@@ -1,13 +1,13 @@
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
 const path = require("path");
 
 const repoRoot = path.join(__dirname, "../..");
 let running = false;
 let queued = false;
 
-const runCommand = (command) => {
+const runCommand = (args) => {
   return new Promise((resolve, reject) => {
-    exec(command, { cwd: repoRoot }, (error, stdout, stderr) => {
+    execFile("git", args, { cwd: repoRoot }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
         return;
@@ -15,6 +15,17 @@ const runCommand = (command) => {
       resolve(stdout);
     });
   });
+};
+
+const normalizeRepo = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .replace(/^https?:\/\/github\.com\//i, "")
+    .replace(/\.git$/i, "")
+    .replace(/^\/+|\/+$/g, "");
 };
 
 const doBackup = async (reason) => {
@@ -25,11 +36,11 @@ const doBackup = async (reason) => {
   }
 
   try {
-    await runCommand("git add src/db/users.json src/db/items.json uploads");
+    await runCommand(["add", "src/db/users.json", "src/db/items.json", "uploads"]);
 
     let hasChanges = true;
     try {
-      await runCommand("git diff --cached --quiet");
+      await runCommand(["diff", "--cached", "--quiet"]);
       hasChanges = false;
     } catch (_err) {
       hasChanges = true;
@@ -42,20 +53,21 @@ const doBackup = async (reason) => {
     const authorName = process.env.GIT_AUTHOR_NAME || "Render Auto Backup";
     const authorEmail = process.env.GIT_AUTHOR_EMAIL || "render-backup@local";
 
-    await runCommand(`git config user.name \"${authorName}\"`);
-    await runCommand(`git config user.email \"${authorEmail}\"`);
+    await runCommand(["config", "user.name", authorName]);
+    await runCommand(["config", "user.email", authorEmail]);
 
     const stamp = new Date().toISOString();
-    await runCommand(`git commit -m \"backup: ${reason} (${stamp})\"`);
+    await runCommand(["commit", "-m", `backup: ${reason} (${stamp})`]);
 
     const pushTarget = process.env.GIT_PUSH_TARGET || "HEAD:main";
     const githubToken = process.env.GITHUB_TOKEN;
-    const githubRepo = process.env.GITHUB_REPO;
+    const githubRepo = normalizeRepo(process.env.GITHUB_REPO);
 
     if (githubToken && githubRepo) {
-      await runCommand(`git push https://${githubToken}@github.com/${githubRepo}.git ${pushTarget}`);
+      const remoteUrl = `https://x-access-token:${encodeURIComponent(githubToken)}@github.com/${githubRepo}.git`;
+      await runCommand(["push", remoteUrl, pushTarget]);
     } else {
-      await runCommand(`git push origin ${pushTarget}`);
+      await runCommand(["push", "origin", pushTarget]);
     }
 
     console.log("[auto-backup] GitHub backup pushed successfully");

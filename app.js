@@ -61,6 +61,28 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
+app.use((err, req, res, next) => {
+  if (err && err.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({
+      message: "Image is too large. Max size is 10MB."
+    });
+  }
+
+  if (err && err.message === "Only images allowed") {
+    return res.status(400).json({
+      message: "Only JPG, PNG, and WEBP images are allowed."
+    });
+  }
+
+  if (err) {
+    return res.status(500).json({
+      message: "Upload failed"
+    });
+  }
+
+  return next();
+});
+
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {

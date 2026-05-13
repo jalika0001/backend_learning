@@ -7,9 +7,9 @@ const {
   uploadBufferFile,
   deleteFile
 } = require("../utils/githubJsonStore");
+const { compressToTargetSize } = require("../utils/imageProcessor");
 
-const makeImageName = (originalName) => {
-  const ext = path.extname(originalName || "").toLowerCase();
+const makeImageName = (ext) => {
   return `${Date.now()}${ext}`;
 };
 
@@ -54,9 +54,10 @@ exports.createItem = async (req, res) => {
 
     let imageName = null;
     if (req.file?.buffer) {
-      imageName = makeImageName(req.file.originalname);
+      const processed = await compressToTargetSize(req.file.buffer, req.file.mimetype);
+      imageName = makeImageName(processed.extension);
       const githubImagePath = `${UPLOADS_DIR}/${imageName}`;
-      await uploadBufferFile(githubImagePath, req.file.buffer, `uploads: create ${imageName}`);
+      await uploadBufferFile(githubImagePath, processed.buffer, `uploads: create ${imageName}`);
     }
 
     const newItem = {
@@ -114,9 +115,10 @@ exports.updateItem = async (req, res) => {
     items[itemIndex].price = price;
 
     if (req.file?.buffer) {
-      const newImageName = makeImageName(req.file.originalname);
+      const processed = await compressToTargetSize(req.file.buffer, req.file.mimetype);
+      const newImageName = makeImageName(processed.extension);
       const newImagePath = `${UPLOADS_DIR}/${newImageName}`;
-      await uploadBufferFile(newImagePath, req.file.buffer, `uploads: update ${newImageName}`);
+      await uploadBufferFile(newImagePath, processed.buffer, `uploads: update ${newImageName}`);
 
       if (items[itemIndex].image) {
         const oldImagePath = `${UPLOADS_DIR}/${items[itemIndex].image}`;
